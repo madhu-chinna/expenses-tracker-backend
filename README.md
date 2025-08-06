@@ -1,16 +1,18 @@
 # Expenses Tracking Backend
 
-A Node.js/Express backend with SQLite database for tracking personal expenses.
+A Node.js backend API for tracking personal expenses with user authentication and expense management.
 
 ## Features
 
-- RESTful API for CRUD operations on expenses
-- SQLite database with automatic table creation
-- Category management with default categories
-- Expense statistics and reporting
-- CORS enabled for frontend integration
+- User registration and authentication with JWT
+- CRUD operations for expenses
+- Expense categorization
+- Statistics and reporting
+- In-memory storage (perfect for Render deployment)
 
-## Setup
+## Quick Start
+
+### Local Development
 
 1. Install dependencies:
 ```bash
@@ -19,61 +21,67 @@ npm install
 
 2. Start the server:
 ```bash
-# Development mode (with nodemon)
-npm run dev
-
-# Production mode
 npm start
 ```
 
-The server will run on `http://localhost:5000`
+3. The server will run on `http://localhost:3008`
+
+### Render Deployment
+
+1. **Build Command**: `npm install`
+2. **Start Command**: `node server.js`
+3. **Environment Variables**:
+   - `NODE_ENV=production`
+   - `PORT=3008`
+   - `JWT_SECRET=your-secret-key-here`
 
 ## API Endpoints
 
-### Expenses
+### Authentication
+- `POST /api/auth/register` - User registration
+- `POST /api/auth/login` - User login
+- `GET /api/auth/profile` - Get user profile
 
-- `GET /api/expenses` - Get all expenses
-- `GET /api/expenses/:id` - Get expense by ID
-- `POST /api/expenses` - Create new expense
-- `PUT /api/expenses/:id` - Update expense
-- `DELETE /api/expenses/:id` - Delete expense
+### Expenses
+- `GET /api/expenses` - Get all expenses (authenticated)
+- `GET /api/expenses/:id` - Get specific expense (authenticated)
+- `POST /api/expenses` - Create new expense (authenticated)
+- `PUT /api/expenses/:id` - Update expense (authenticated)
+- `DELETE /api/expenses/:id` - Delete expense (authenticated)
 
 ### Categories
-
 - `GET /api/categories` - Get all categories
 
 ### Statistics
+- `GET /api/statistics` - Get expense statistics (authenticated)
 
-- `GET /api/statistics` - Get expense statistics
-- `GET /api/statistics?startDate=2024-01-01&endDate=2024-12-31` - Get statistics for date range
+### Utilities
+- `GET /api/health` - Health check
+- `DELETE /api/cleanup/all` - Cleanup all data (for testing)
 
-### Health Check
+## Default Data
 
-- `GET /api/health` - API health status
+The application comes with:
+- A demo user (username: `demo`, password: `password`)
+- Sample expenses
+- Pre-configured expense categories
 
-## Database Schema
+## Notes
 
-### Expenses Table
-- `id` (TEXT, PRIMARY KEY) - Unique identifier
-- `description` (TEXT) - Expense description
-- `amount` (REAL) - Expense amount
-- `category` (TEXT) - Expense category
-- `date` (TEXT) - Expense date
-- `created_at` (DATETIME) - Creation timestamp
+- **In-memory storage**: Data is stored in memory and will be reset on server restart
+- **Perfect for Render**: No database dependencies, works seamlessly on Render
+- **Development friendly**: Easy to test and deploy
 
-### Categories Table
-- `id` (INTEGER, PRIMARY KEY) - Auto-increment ID
-- `name` (TEXT, UNIQUE) - Category name
-- `color` (TEXT) - Category color for UI
+## Testing
 
-## Default Categories
+You can test the API using tools like Postman or curl:
 
-The system comes with pre-configured categories:
-- Food & Dining
-- Transportation
-- Shopping
-- Entertainment
-- Bills & Utilities
-- Healthcare
-- Education
-- Other 
+```bash
+# Health check
+curl https://your-render-app.onrender.com/api/health
+
+# Login
+curl -X POST https://your-render-app.onrender.com/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"demo","password":"password"}'
+``` 
