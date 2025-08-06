@@ -4,10 +4,90 @@ const bodyParser = require('body-parser');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
+const fs = require('fs');
+const path = require('path');
 
 const app = express();
 const PORT = process.env.PORT || 3008;
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+
+// Data file paths
+const DATA_DIR = path.join(__dirname, 'data');
+const USERS_FILE = path.join(DATA_DIR, 'users.json');
+const EXPENSES_FILE = path.join(DATA_DIR, 'expenses.json');
+
+// Ensure data directory exists
+if (!fs.existsSync(DATA_DIR)) {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+}
+
+// Load data from files or use defaults
+const loadData = (filePath, defaultValue) => {
+  try {
+    if (fs.existsSync(filePath)) {
+      const data = fs.readFileSync(filePath, 'utf8');
+      return JSON.parse(data);
+    }
+  } catch (error) {
+    console.error(`Error loading data from ${filePath}:`, error);
+  }
+  return defaultValue;
+};
+
+// Save data to files
+const saveData = (filePath, data) => {
+  try {
+    fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
+  } catch (error) {
+    console.error(`Error saving data to ${filePath}:`, error);
+  }
+};
+
+// Initialize data
+let users = loadData(USERS_FILE, [
+  {
+    id: 'default-user',
+    username: 'demo',
+    email: 'demo@example.com',
+    password: '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', // 'password'
+    created_at: new Date().toISOString()
+  }
+]);
+
+let expenses = loadData(EXPENSES_FILE, [
+  {
+    id: '1',
+    user_id: 'default-user',
+    description: 'Grocery shopping',
+    amount: 150.50,
+    category: 'Food & Dining',
+    date: '2024-01-15',
+    created_at: new Date().toISOString()
+  },
+  {
+    id: '2',
+    user_id: 'default-user',
+    description: 'Gas station',
+    amount: 45.00,
+    category: 'Transportation',
+    date: '2024-01-14',
+    created_at: new Date().toISOString()
+  }
+]);
+
+let categories = [
+  { id: 1, name: 'Food & Dining', color: '#28a745' },
+  { id: 2, name: 'Transportation', color: '#007bff' },
+  { id: 3, name: 'Shopping', color: '#ffc107' },
+  { id: 4, name: 'Entertainment', color: '#dc3545' },
+  { id: 5, name: 'Bills & Utilities', color: '#6f42c1' },
+  { id: 6, name: 'Healthcare', color: '#fd7e14' },
+  { id: 7, name: 'Education', color: '#20c997' },
+  { id: 8, name: 'Other', color: '#6c757d' }
+];
+
+let nextExpenseId = Math.max(...expenses.map(e => parseInt(e.id)), 0) + 1;
+let nextCategoryId = 9;
 
 // Middleware
 app.use(cors());
@@ -31,52 +111,6 @@ const authenticateToken = (req, res, next) => {
     next();
   });
 };
-
-// In-memory storage for Render deployment
-let users = [
-  {
-    id: 'default-user',
-    username: 'demo',
-    email: 'demo@example.com',
-    password: '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', // 'password'
-    created_at: new Date().toISOString()
-  }
-];
-
-let expenses = [
-  {
-    id: '1',
-    user_id: 'default-user',
-    description: 'Grocery shopping',
-    amount: 150.50,
-    category: 'Food & Dining',
-    date: '2024-01-15',
-    created_at: new Date().toISOString()
-  },
-  {
-    id: '2',
-    user_id: 'default-user',
-    description: 'Gas station',
-    amount: 45.00,
-    category: 'Transportation',
-    date: '2024-01-14',
-    created_at: new Date().toISOString()
-  }
-];
-
-let categories = [
-  { id: 1, name: 'Food & Dining', color: '#28a745' },
-  { id: 2, name: 'Transportation', color: '#007bff' },
-  { id: 3, name: 'Shopping', color: '#ffc107' },
-  { id: 4, name: 'Entertainment', color: '#dc3545' },
-  { id: 5, name: 'Bills & Utilities', color: '#6f42c1' },
-  { id: 6, name: 'Healthcare', color: '#fd7e14' },
-  { id: 7, name: 'Education', color: '#20c997' },
-  { id: 8, name: 'Other', color: '#6c757d' }
-];
-
-let nextExpenseId = 3;
-let nextCategoryId = 9;
 
 // Authentication Routes
 
@@ -113,6 +147,7 @@ app.post('/api/auth/register', async (req, res) => {
     };
 
     users.push(newUser);
+    saveData(USERS_FILE, users); // Save updated users
 
     // Generate JWT token
     const token = jwt.sign({ userId, username }, JWT_SECRET, { expiresIn: '24h' });
@@ -248,6 +283,7 @@ app.post('/api/expenses', authenticateToken, (req, res) => {
     };
 
     expenses.push(newExpense);
+    saveData(EXPENSES_FILE, expenses); // Save updated expenses
     nextExpenseId++;
 
     res.status(201).json(newExpense);
@@ -282,6 +318,7 @@ app.put('/api/expenses/:id', authenticateToken, (req, res) => {
       date
     };
 
+    saveData(EXPENSES_FILE, expenses); // Save updated expenses
     res.json(expenses[expenseIndex]);
   } catch (error) {
     res.status(500).json({ error: 'Server error' });
@@ -301,6 +338,7 @@ app.delete('/api/expenses/:id', authenticateToken, (req, res) => {
     }
 
     expenses.splice(expenseIndex, 1);
+    saveData(EXPENSES_FILE, expenses); // Save updated expenses
     res.json({ message: 'Expense deleted successfully' });
   } catch (error) {
     res.status(500).json({ error: 'Server error' });
@@ -361,14 +399,116 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', message: 'Expenses API is running' });
 });
 
+// Debug endpoint to see all users (temporary - remove in production)
+app.get('/api/debug/users', (req, res) => {
+  try {
+    const usersWithoutPasswords = users.map(user => ({
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      created_at: user.created_at
+    }));
+    
+    res.json({
+      totalUsers: users.length,
+      users: usersWithoutPasswords,
+      dataFile: USERS_FILE,
+      fileExists: fs.existsSync(USERS_FILE)
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Debug endpoint to see all expenses (temporary - remove in production)
+app.get('/api/debug/expenses', (req, res) => {
+  try {
+    res.json({
+      totalExpenses: expenses.length,
+      expenses: expenses,
+      dataFile: EXPENSES_FILE,
+      fileExists: fs.existsSync(EXPENSES_FILE)
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // Cleanup all data (for development/production deployment)
 app.delete('/api/cleanup/all', async (req, res) => {
   try {
-    expenses = [];
-    nextExpenseId = 1;
-    res.json({ message: 'All data cleaned up successfully' });
+    // Reset to initial state
+    users = [
+      {
+        id: 'default-user',
+        username: 'demo',
+        email: 'demo@example.com',
+        password: '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', // 'password'
+        created_at: new Date().toISOString()
+      }
+    ];
+    
+    expenses = [
+      {
+        id: '1',
+        user_id: 'default-user',
+        description: 'Grocery shopping',
+        amount: 150.50,
+        category: 'Food & Dining',
+        date: '2024-01-15',
+        created_at: new Date().toISOString()
+      },
+      {
+        id: '2',
+        user_id: 'default-user',
+        description: 'Gas station',
+        amount: 45.00,
+        category: 'Transportation',
+        date: '2024-01-14',
+        created_at: new Date().toISOString()
+      }
+    ];
+    
+    nextExpenseId = 3;
+    nextCategoryId = 9;
+    saveData(USERS_FILE, users); // Save updated users
+    saveData(EXPENSES_FILE, expenses); // Save updated expenses
+    
+    res.json({ 
+      message: 'All data cleaned up successfully. Reset to demo state.',
+      demoUser: {
+        username: 'demo',
+        password: 'password'
+      }
+    });
   } catch (error) {
     res.status(500).json({ error: 'Failed to cleanup data' });
+  }
+});
+
+// Cleanup only users (reset to demo user)
+app.delete('/api/cleanup/users', async (req, res) => {
+  try {
+    users = [
+      {
+        id: 'default-user',
+        username: 'demo',
+        email: 'demo@example.com',
+        password: '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', // 'password'
+        created_at: new Date().toISOString()
+      }
+    ];
+    saveData(USERS_FILE, users); // Save updated users
+    
+    res.json({ 
+      message: 'Users cleaned up successfully. Reset to demo user.',
+      demoUser: {
+        username: 'demo',
+        password: 'password'
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to cleanup users' });
   }
 });
 
