@@ -371,18 +371,29 @@ app.get('/api/statistics', authenticateToken, (req, res) => {
     // Calculate total
     const total = userExpenses.reduce((sum, expense) => sum + expense.amount, 0);
 
-    // Calculate by category
+    // Calculate by category with color information
     const byCategory = {};
     userExpenses.forEach(expense => {
       if (byCategory[expense.category]) {
-        byCategory[expense.category] += expense.amount;
+        byCategory[expense.category].total += expense.amount;
       } else {
-        byCategory[expense.category] = expense.amount;
+        // Find category color
+        const categoryInfo = categories.find(c => c.name === expense.category);
+        byCategory[expense.category] = {
+          total: expense.amount,
+          color: categoryInfo ? categoryInfo.color : '#6c757d',
+          name: expense.category
+        };
       }
     });
 
-    const categoryStats = Object.entries(byCategory)
-      .map(([category, total]) => ({ category, total }))
+    const categoryStats = Object.values(byCategory)
+      .map(({ total, color, name }) => ({ 
+        category: name, 
+        total, 
+        color,
+        name: name // Add name for pie chart labels
+      }))
       .sort((a, b) => b.total - a.total);
 
     res.json({
